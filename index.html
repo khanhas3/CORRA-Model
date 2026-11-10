@@ -123,16 +123,16 @@
 
   <section class="panel">
     <h2>Curve quotes <span class="badge hide" id="sampleBadge">SAMPLE DATA</span><span class="sp"></span>
-      <button class="btn sm" id="bAddRow">+ Row</button><button class="btn sm" id="bDelRow">− Row</button><button class="btn sm" data-copy="quotes">Copy</button></h2>
+      <button class="btn sm" id="bAddRow">Add row</button><button class="btn sm" id="bDelRow">Remove row</button><button class="btn sm" data-copy="quotes">Copy</button></h2>
     <div class="body">
       <div class="scroll">
         <table class="grid-in" id="quoteGrid">
-          <thead><tr><th>#</th><th class="l">Tenor</th><th>OIS par %</th><th class="projCol hide">Term CORRA par %</th><th>Scen Δ bp</th></tr></thead>
+          <thead><tr><th class="l">Tenor</th><th>OIS par %</th><th class="projCol hide">Term CORRA par %</th><th>Shift bp</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
-      <details class="conv"><summary>Curve conventions</summary>
-        <div class="form" style="margin-top:6px">
+      <div class="hide">
+        <div class="form">
           <div><label for="cOisSpot">OIS spot lag (BD)</label><input id="cOisSpot" value="0"></div>
           <div><label for="cOisPay">OIS pay lag (BD)</label><input id="cOisPay" value="1"></div>
           <div><label for="cOisFreq">OIS frequency</label><select id="cOisFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option><option value="0">At maturity</option></select></div>
@@ -140,7 +140,7 @@
           <div><label for="cTPay">Term pay lag (BD)</label><input id="cTPay" value="0"></div>
           <div><label for="cTFreq">Term frequency</label><select id="cTFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option></select></div>
         </div>
-      </details>
+      </div>
     </div>
   </section>
 
@@ -156,16 +156,16 @@
         <div><label for="mat">Maturity</label><input id="mat" placeholder="5Y or 2031-11-10"></div>
         <div class="wide"><label for="index">Float index</label>
           <select id="index">
-            <option value="OIS">CORRA OIS · compounded in arrears</option>
-            <option value="T3">Term CORRA 3M · dual curve</option>
-            <option value="T1">Term CORRA 1M · dual curve</option>
+            <option value="OIS">CORRA OIS</option>
+            <option value="T3">Term CORRA 3M</option>
+            <option value="T1">Term CORRA 1M</option>
           </select></div>
-        <div><label for="fixFreq">Fixed freq</label><select id="fixFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option><option value="1">Monthly</option><option value="0">At maturity</option></select></div>
-        <div><label for="fltFreq">Float freq</label><select id="fltFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option><option value="1">Monthly</option><option value="0">At maturity</option></select></div>
-        <div><label for="dc">Day count</label><select id="dc"><option value="A365F">ACT/365F</option><option value="A360">ACT/360</option></select></div>
-        <div><label for="spotLag">Spot lag (BD)</label><input id="spotLag" inputmode="numeric" value="0"></div>
-        <div><label for="payLag">Pay lag (BD)</label><input id="payLag" inputmode="numeric" value="1"></div>
-        <div class="wide termOnly hide"><label for="termFix">Known Term CORRA fixings % (seasoned only)</label><input id="termFix" placeholder="2.61, 2.64"></div>
+        <div><label for="fixFreq">Fixed freq</label><select id="fixFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option></select></div>
+        <div><label for="fltFreq">Float freq</label><select id="fltFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option></select></div>
+        <div class="hide"><label for="dc">Day count</label><select id="dc"><option value="A365F">ACT/365F</option><option value="A360">ACT/360</option></select></div>
+        <div class="hide"><label for="spotLag">Spot lag (BD)</label><input id="spotLag" inputmode="numeric" value="0"></div>
+        <div class="hide"><label for="payLag">Pay lag (BD)</label><input id="payLag" inputmode="numeric" value="1"></div>
+        <div class="wide termOnly hide"><label for="termFix">Term CORRA fixings % (seasoned)</label><input id="termFix" placeholder="2.61, 2.64"></div>
       </div>
       <p class="note hide" id="convNote"></p>
       <div class="buttons">
@@ -198,7 +198,7 @@
   <section class="panel">
     <h2>Risk</h2>
     <div class="body">
-      <h3 class="sub">Bucketed DV01 · +1bp per quote</h3>
+      <h3 class="sub">DV01 by tenor</h3>
       <div class="tblbar"><button class="btn sm" data-copy="buckets">Copy</button><button class="btn sm" data-csv="buckets">CSV</button></div>
       <div class="scroll" style="margin-bottom:10px"><table id="t_buckets"></table></div>
       <canvas class="ch" id="chBucket" style="height:160px"></canvas>
@@ -207,19 +207,17 @@
       <h3 class="sub">Scenario builder</h3>
       <div class="form">
         <div><label for="sPar">Parallel bp</label><input id="sPar" inputmode="decimal" placeholder="0"></div>
-        <div><label for="sSlope">2s10s Δ bp</label><input id="sSlope" inputmode="decimal" placeholder="0"></div>
+        <div><label for="sSlope">2s10s bp</label><input id="sSlope" inputmode="decimal" placeholder="0"></div>
         <div><label for="sCurv">5Y belly bp</label><input id="sCurv" inputmode="decimal" placeholder="0"></div>
-        <div class="projOnly hide"><label for="sBasis">Term–OIS basis bp</label><input id="sBasis" inputmode="decimal" placeholder="0"></div>
+        <div class="projOnly hide"><label for="sBasis">Basis bp</label><input id="sBasis" inputmode="decimal" placeholder="0"></div>
       </div>
       <div class="presets">
         <button class="btn sm" data-p="100,0,0">+100</button>
-        <button class="btn sm" data-p="-100,0,0">−100</button>
+        <button class="btn sm" data-p="-100,0,0">-100</button>
         <button class="btn sm" data-p="12.5,25,0">Bear steep</button>
         <button class="btn sm" data-p="-12.5,-25,0">Bull flat</button>
         <button class="btn sm" data-p="12.5,-25,0">Bear flat</button>
         <button class="btn sm" data-p="-12.5,25,0">Bull steep</button>
-        <button class="btn sm" data-p="0,0,10">Fly +10</button>
-        <button class="btn sm" data-p="0,0,0">Reset</button>
       </div>
       <div class="buttons"><button class="btn" id="bApplyScen">Apply to curve</button></div>
 
@@ -362,11 +360,7 @@ function reval(st,fo,fp){const cv=buildCurves(st,shiftQ(st.oisQ,fo),st.projQ?shi
 const wSlope=t=>t<=2?-.5:t>=10?.5:-.5+(t-2)/8;
 const cBelly=t=>t<=2||t>=10?0:t<=5?(t-2)/3:(10-t)/5;
 const shape=(par,sl,cu)=>t=>par+sl*wSlope(t)+cu*cBelly(t);
-const MATRIX=[['Parallel −100',-100,0,0],['Parallel −50',-50,0,0],['Parallel −25',-25,0,0],['Parallel −10',-10,0,0],
-  ['Parallel +10',10,0,0],['Parallel +25',25,0,0],['Parallel +50',50,0,0],['Parallel +100',100,0,0],
-  ['Bear steepener (2Y 0 / 10Y +25)',12.5,25,0],['Bull flattener (2Y 0 / 10Y −25)',-12.5,-25,0],
-  ['Bear flattener (2Y +25 / 10Y 0)',12.5,-25,0],['Bull steepener (2Y −25 / 10Y 0)',-12.5,25,0],
-  ['Butterfly (5Y +10)',0,0,10],['Butterfly (5Y −10)',0,0,-10]];
+const MATRIX=[['Parallel -100',-100,0,0],['Parallel -25',-25,0,0],['Parallel +25',25,0,0],['Parallel +100',100,0,0],['Steepener 25bp',0,25,0],['Flattener 25bp',0,-25,0]];
 
 /* ================= FORMAT / CELLS ================= */
 const fm=(v,dp)=>isFinite(v)?(Math.abs(v)<.5*Math.pow(10,-dp)?0:v).toLocaleString('en-US',{minimumFractionDigits:dp,maximumFractionDigits:dp}):'—';
@@ -400,7 +394,7 @@ const DEF_TENORS=['1M','3M','6M','9M','1Y','18M','2Y','3Y','4Y','5Y','7Y','10Y',
 const tbody=document.querySelector('#quoteGrid tbody');
 const isProj=()=>$('index').value!=='OIS';
 function addRow(ten){const i=tbody.rows.length+1;const tr=document.createElement('tr');
-  tr.innerHTML='<td class="l idx">'+i+'</td><td class="l"><input class="ten" value="'+(ten||'')+'" aria-label="Tenor"></td>'+
+  tr.innerHTML='<td class="l"><input class="ten" value="'+(ten||'')+'" aria-label="Tenor"></td>'+
   '<td><input class="qO" inputmode="decimal" aria-label="OIS par rate"></td><td class="projCol'+(isProj()?'':' hide')+'"><input class="qT" inputmode="decimal" aria-label="Term CORRA par rate"></td>'+
   '<td><input class="qS" inputmode="decimal" aria-label="Scenario shift bp"></td>';tbody.appendChild(tr)}
 DEF_TENORS.forEach(t=>addRow(t));
@@ -431,8 +425,7 @@ function setConvDefaults(){const p=isProj();
   $('spotLag').value=p?2:0;$('payLag').value=p?0:1;$('fixFreq').value='6';$('fltFreq').value='6';$('dc').value='A365F';
   document.querySelectorAll('.projCol').forEach(e=>e.classList.toggle('hide',!p));
   document.querySelectorAll('.termOnly,.projOnly').forEach(e=>e.classList.toggle('hide',!p));
-  $('convNote').textContent=p?'CARR terms: T+2 · semi-annual · ACT/365F · no pay lag · OIS discounting.'
-    :'T+0 · semi-annual · ACT/365F · 1 BD pay lag.';
+  
 }
 $('index').addEventListener('change',setConvDefaults);setConvDefaults();
 $('valDate').value=D.iso(D.today());
@@ -505,7 +498,7 @@ async function run(){
     let custom=null,cvS=null;
     if(hasCustom){const fo=x=>x.sh,fp=x=>x.sh+st.basis;
       cvS=buildCurves(st,shiftQ(st.oisQ,fo),st.projQ?shiftQ(st.projQ,fp):null);const pv=priceTrade(st.tr,cvS).pv;
-      custom={name:'Custom (grid Scen Δ'+(st.basis?' + basis '+st.basis+'bp':'')+')',pv,pnl:pv-base.pv}}
+      custom={name:'Custom',pv,pnl:pv-base.pv}}
     const lastPillar=Math.max(...cv.disc.inst.map(x=>x.mat),...(cv.proj?cv.proj.inst.map(x=>x.mat):[]));
     if(base.lastPay>lastPillar)warns.push('Cash flows past last pillar ('+D.fmt(lastPillar)+'): flat extrapolation.');
     if(base.flags.est)warns.push(base.flags.est+' unpublished fixing day(s) used the latest fixing.');
@@ -521,17 +514,15 @@ async function run(){
 function render(){
   const {st,cv,base,dv01,gamma,buckets,scen,custom}=LAST;const tr=st.tr;
   const side=tr.dir>0?'Pay fixed':'Receive fixed';
-  $('sumTag').textContent=side+' · '+({OIS:'CORRA OIS',T3:'Term CORRA 3M',T1:'Term CORRA 1M'})[tr.index]+(st.projQ?' · dual curve':' · single curve');
+  $('sumTag').textContent=side+', '+({OIS:'CORRA OIS',T3:'Term CORRA 3M',T1:'Term CORRA 1M'})[tr.index];
   const fixP=schedule(tr.eff,tr.matU,tr.fixFm,tr.payLag,tr.dc);const mat=fixP[fixP.length-1].e;
   const kv=[
-    ['PV (dirty)',fm(base.pv,2),sgn(base.pv),1],['Clean PV',fm(base.clean,2),sgn(base.clean),1],
-    ['DV01 (+1bp par)',fm(dv01,2),sgn(dv01),1],['PV01 (fixed leg)',fm(base.pv01,2),'',0],
-    ['Gamma (1bp)',fm(gamma,2),sgn(gamma),0],['Accrued (net)',fm(base.acc,2),sgn(base.acc),0],
-    ['PV fixed leg',fm(base.pvFix,2),'',0],['PV float leg',fm(base.pvFlt,2),'',0],
-    ['Fixed rate',sf(tr.K*100)+'%','',0],['Breakeven rate',sf(base.be*100)+'%','acc',0],
-    ['Notional',fm(tr.N,0),'',0],['Valuation',D.fmt(st.t0),'',0],['Effective',D.fmt(tr.eff),'',0],['Maturity',D.fmt(mat),'',0]
+    ['PV',fm(base.pv,2),sgn(base.pv),1],['DV01',fm(dv01,2),sgn(dv01),1],
+    ['PV01',fm(base.pv01,2),'',0],['Breakeven',sf(base.be*100)+'%','acc',0],
+    ['Accrued',fm(base.acc,2),sgn(base.acc),0],['Clean PV',fm(base.clean,2),sgn(base.clean),0],
+    ['Effective',D.fmt(tr.eff),'',0],['Maturity',D.fmt(mat),'',0]
   ];
-  if(custom)kv.splice(4,0,['Custom scen. P&L',fm(custom.pnl,2),sgn(custom.pnl),1]);
+  if(custom)kv.splice(2,0,['Custom P&L',fm(custom.pnl,2),sgn(custom.pnl),1]);
   $('kv').innerHTML=kv.map(([k,v,c,h])=>'<div class="'+(h?'hl':'')+'"><b>'+k+'</b><span class="'+c+'">'+v+'</span></div>').join('');
   TABLES.summary={title:'Summary',heads:['Metric','Value'],rows:[
     ['Side',side],['Float index',tr.index],['Valuation date',D.iso(st.t0)],['Effective date',D.iso(tr.eff)],['Maturity date',D.iso(mat)],
@@ -542,29 +533,30 @@ function render(){
 
   // buckets
   const tot=buckets.reduce((a,b)=>a+b.dv,0);
-  renderTable('buckets','Bucketed DV01',['Curve','Tenor','Pillar date','Quote %','DV01','% of total'],
-    buckets.map(b=>[C.s(b.curve),C.s(b.q.ten.label),C.d(curveInst(b).mat),C.pc(b.q.rate),C.m(b.dv),C.n(tot?100*b.dv/tot:0,1)]),
-    [C.s('Σ buckets'),C.s(''),C.s(''),C.s('par Δ '+fm(dv01,2),'mut'),C.m(tot),C.n(100,1)]);
+  const dual=!!st.projQ;const cc=b=>dual?[C.s(b.curve==='OIS'?'OIS':'Term')]:[];
+  renderTable('buckets','DV01 by tenor',(dual?['Curve']:[]).concat(['Tenor','DV01','% of total']),
+    buckets.map(b=>cc(b).concat([C.s(b.q.ten.label),C.m(b.dv),C.n(tot?100*b.dv/tot:0,1)])),
+    (dual?[C.s('')]:[]).concat([C.s('Total'),C.m(tot),C.n(100,1)]));
   drawBuckets(buckets);
 
   // scenarios
   const srows=scen.concat(custom?[custom]:[]);
-  renderTable('scen','Scenario P&L',['Scenario','Scenario PV','P&L','P&L / |DV01|'],
-    srows.map(s=>[C.s(s.name),C.m(s.pv,''),C.m(s.pnl),C.n(dv01?s.pnl/Math.abs(dv01):0,1)]));
+  renderTable('scen','Scenario P&L',['Scenario','PV','P&L'],
+    srows.map(s=>[C.s(s.name),C.m(s.pv,''),C.m(s.pnl)]));
   drawCurves();
 
   // cash flows
   const rows=base.rows.slice().sort((a,b)=>a.p.pay-b.p.pay||a.leg.localeCompare(b.leg));
   let sF=0,sL=0;
-  renderTable('cf','Cash flows',['Leg','Accrual start','Accrual end','Pay date','Days','τ','Rate %','Status','Cash flow','DF (pay)','PV (your side)'],
+  renderTable('cf','Cash flows',['Leg','Start','End','Pay date','Rate %','Cash flow','PV'],
     rows.map(r=>{const sgnLeg=(r.leg==='Fixed'?-1:1)*tr.dir;const pv=sgnLeg*r.pv;if(r.leg==='Fixed')sF+=pv;else sL+=pv;
-      return [C.s(r.leg,r.leg==='Fixed'?'acc':''),C.d(r.p.s),C.d(r.p.e),C.d(r.p.pay),C.n(r.p.e-r.p.s,0),C.n(r.p.tau,6),C.pc(r.rate),C.s(r.st,'mut'),C.m(sgnLeg*r.cf),C.n(r.df,8),C.m(pv)]}),
-    [C.s('Total'),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.m(sF+sL)]);
+      return [C.s(r.leg,r.leg==='Fixed'?'acc':''),C.d(r.p.s),C.d(r.p.e),C.d(r.p.pay),C.pc(r.rate),C.m(sgnLeg*r.cf),C.m(pv)]}),
+    [C.s('Total'),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.m(sF+sL)]);
 
   // curves
-  const crow=(name,ins)=>[C.s(name),C.s(ins.ten.label),C.d(ins.mat),C.n(ins.t,6),C.pc(ins.rate),C.n(ins.df,10),C.pc(ins.zero),C.pc(ins.fwd)];
-  renderTable('curves','Curves',['Curve','Tenor','Maturity','t (yrs)','Par %','Discount factor','Zero % (cc)','Fwd % (seg)'],
-    cv.disc.inst.map(i=>crow('CORRA OIS',i)).concat(cv.proj?cv.proj.inst.map(i=>crow('Term CORRA',i)):[]));
+  const crow=(name,ins)=>(dual?[C.s(name)]:[]).concat([C.s(ins.ten.label),C.d(ins.mat),C.pc(ins.rate),C.n(ins.df,6),C.pc(ins.zero)]);
+  renderTable('curves','Curves',(dual?['Curve']:[]).concat(['Tenor','Maturity','Par %','Discount factor','Zero %']),
+    cv.disc.inst.map(i=>crow('OIS',i)).concat(cv.proj?cv.proj.inst.map(i=>crow('Term',i)):[]));
 }
 const r2=v=>Math.round(v*100)/100;
 function curveInst(b){const c=b.curve==='OIS'?LAST.cv.disc:LAST.cv.proj;return c.inst.find(x=>x.ten===b.q.ten)||{mat:0}}
