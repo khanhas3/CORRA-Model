@@ -78,7 +78,8 @@ TENORS.forEach((t, i) => {
   quotesDiv.innerHTML += `<div><label>${t < 1 ? t * 12 + 'M' : t + 'Y'}</label><input id="q${i}" style="width:80px"></div>`;
 });
 for (let y = 1; y <= 10; y++) document.getElementById('tenor').innerHTML += `<option ${y === 5 ? 'selected' : ''}>${y}</option>`;
-document.getElementById('valDate').value = new Date().toISOString().slice(0, 10);
+const today = new Date();
+document.getElementById('valDate').value = new Date(today - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);  // local date
 
 const num = id => parseFloat(document.getElementById(id).value.replace(/,/g, ''));
 const money = v => (Math.abs(v) < 0.005 ? 0 : v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
