@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CORRA Swap Pricer</title>
+<meta name="description" content="CAD CORRA OIS / Term CORRA swap pricer with DV01, key-rate risk and scenarios.">
+<style>
+  :root{
+    --bg:#07090c; --panel:#0e1217; --ink:#d6dde5; --muted:#7c8896; --dim:#4f5965;
+    --line:#1c232c; --line2:#29323d; --head:#131920; --in:#0a0d11;
+    --blue:#60a5fa; --acc:#2dd4bf; --pos:#36c26b; --neg:#ff5a4f; --warn:#e6b422;
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Mono",Consolas,Menlo,monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  td,input,.kv span{font-variant-numeric:tabular-nums}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 14px 40px}
+
+  .masthead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--line2)}
+  .masthead h1{margin:0;font:700 22px var(--mono);letter-spacing:.5px;color:var(--acc);text-transform:uppercase}
+  .masthead p{margin:0;color:var(--muted);font-size:12px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:3px;margin-bottom:10px}
+  .panel > h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;padding:8px 12px;font-size:15px;font-weight:700;
+    letter-spacing:.6px;text-transform:uppercase;color:var(--acc);background:var(--head);border-bottom:1px solid var(--line)}
+  .panel > h2 .sp{flex:1}
+  .panel > h2 small{font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0}
+  .step{color:var(--dim);font-family:var(--mono)}
+  .body{padding:12px}
+  .hint,.note{font-size:12px;color:var(--muted);margin:0 0 10px}
+  h3.sub{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:18px 0 6px}
+  h3.sub:first-child{margin-top:0}
+
+  .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,190px));gap:8px 12px}
+  .form label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+  .form .wide{grid-column:1 / -1}
+  input,select{font:13px var(--mono);width:100%;min-width:0;padding:4px 7px;border:1px solid var(--line2);border-radius:2px;background:var(--in);color:var(--ink)}
+  select{font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--acc)}
+  input.err{border-color:var(--neg)}
+  input::placeholder{color:var(--dim)}
+
+  .scroll{overflow-x:auto}
+  table{width:auto;border-collapse:collapse;font-size:12px}
+  th,td{padding:3px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th{font-weight:600;color:var(--muted);font-size:11px;background:var(--head)}
+  td{font-family:var(--mono)}
+  td.s{font-family:inherit}
+  th.l,td.l{text-align:left}
+  tbody tr:hover td{background:#141b23}
+  tfoot td{font-weight:700;border-top:1px solid var(--line2);border-bottom:0}
+  .grid-in td{padding:2px 5px}
+  .grid-in input{text-align:right;width:90px;padding:2px 6px}
+  .grid-in input.ten{text-align:left;width:56px}
+  .grid-in td.idx{color:var(--dim);font-size:10px;text-align:center}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .mut{color:var(--muted)} .acc{color:var(--acc)}
+  .hide{display:none!important}
+
+  .buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .btn{font:600 12px system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer;padding:5px 12px;border-radius:2px;border:1px solid var(--line2);background:var(--head);color:var(--ink)}
+  .btn:hover{border-color:var(--muted)}
+  .btn.green{background:var(--acc);border-color:var(--acc);color:#111}
+  .btn.green:hover{filter:brightness(1.08)}
+  .btn.sm{font-size:11px;padding:2px 8px}
+
+  .status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);margin-bottom:8px}
+  .tiles{display:flex;gap:28px;margin-bottom:8px}
+  .tile b{display:block;font-size:11px;font-weight:600;color:var(--muted)}
+  .tile span{font:600 20px var(--mono);color:var(--acc)}
+  .tile small{display:block;font-size:10px;color:var(--dim)}
+.asof{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .asof #tkCorraD{font:700 20px var(--mono);color:var(--ink)}
+  .asof #liveSt{font-size:12px}
+  #spark{width:100%;height:70px;display:block}
+
+  .kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:6px}
+  .kv:empty{display:none}
+  .kv div{background:var(--panel);padding:6px 9px}
+  .kv b{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .kv span{font:14px var(--mono)}
+  .kv .hl span{font-size:17px;font-weight:700}
+  .msgs{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .msg{border-left:3px solid var(--neg);padding:5px 10px;font-size:12px;background:var(--head);color:var(--ink)}
+  .msg.warn{border-color:var(--warn)} .msg.ok{border-color:var(--pos)}
+  .badge{font-size:10px;font-weight:700;padding:0 6px;color:var(--warn);border:1px solid var(--warn);border-radius:2px;letter-spacing:.4px}
+  canvas.ch{width:100%;height:200px;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted);margin-top:4px}
+  .legend i{display:inline-block;width:14px;height:2px;margin-right:6px;vertical-align:middle}
+  .presets{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+  .tblbar{display:flex;gap:4px;margin-bottom:4px}
+  details.conv{margin-top:10px}
+  details.conv summary{cursor:pointer;color:var(--muted);font-size:12px}
+
+  .formula{font-family:var(--mono);font-size:12px;color:var(--acc);background:var(--in);border:1px solid var(--line);padding:6px 10px;margin:4px 0 10px;overflow-x:auto}
+  .notes p{margin:0 0 6px;font-size:12px}
+  footer{text-align:center;font-size:11px;color:var(--dim);margin-top:18px}
+  @media (max-width:520px){th,td{padding:4px 6px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>CORRA Swap Pricer</h1>
+    
+  </header>
+
+  <section class="panel">
+    <h2>Bank of Canada</h2>
+    <div class="body">
+      <div class="asof"><span id="tkCorraD">Loading…</span><span id="liveSt" class="mut"></span></div>
+      <div class="tiles">
+        <div class="tile"><b>CORRA</b><span id="tkCorra">—</span></div>
+        <div class="tile"><b>Policy rate</b><span id="tkPol">—</span></div>
+      </div>
+      <canvas id="spark" aria-label="CORRA, last 60 business days"></canvas>
+      <div class="legend"><span><i style="background:var(--acc)"></i>CORRA, 60 days</span><span><i style="background:var(--dim)"></i>Policy rate</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Curve quotes <span class="badge hide" id="sampleBadge">SAMPLE DATA</span><span class="sp"></span>
+      <button class="btn sm" id="bAddRow">+ Row</button><button class="btn sm" id="bDelRow">− Row</button><button class="btn sm" data-copy="quotes">Copy</button></h2>
+    <div class="body">
+      <div class="scroll">
+        <table class="grid-in" id="quoteGrid">
+          <thead><tr><th>#</th><th class="l">Tenor</th><th>OIS par %</th><th class="projCol hide">Term CORRA par %</th><th>Scen Δ bp</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <details class="conv"><summary>Curve conventions</summary>
+        <div class="form" style="margin-top:6px">
+          <div><label for="cOisSpot">OIS spot lag (BD)</label><input id="cOisSpot" value="0"></div>
+          <div><label for="cOisPay">OIS pay lag (BD)</label><input id="cOisPay" value="1"></div>
+          <div><label for="cOisFreq">OIS frequency</label><select id="cOisFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option><option value="0">At maturity</option></select></div>
+          <div><label for="cTSpot">Term spot lag (BD)</label><input id="cTSpot" value="2"></div>
+          <div><label for="cTPay">Term pay lag (BD)</label><input id="cTPay" value="0"></div>
+          <div><label for="cTFreq">Term frequency</label><select id="cTFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option></select></div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Trade</h2>
+    <div class="body">
+      <div class="form">
+        <div><label for="valDate">Valuation</label><input type="date" id="valDate"></div>
+        <div><label for="dir">Side</label><select id="dir"><option value="1">Pay fixed</option><option value="-1">Receive fixed</option></select></div>
+        <div><label for="notional">Notional</label><input id="notional" inputmode="decimal" placeholder="100,000,000"></div>
+        <div><label for="fixed">Fixed %</label><input id="fixed" inputmode="decimal" placeholder="3.05"></div>
+        <div><label for="effDate">Effective (blank = spot)</label><input type="date" id="effDate"></div>
+        <div><label for="mat">Maturity</label><input id="mat" placeholder="5Y or 2031-11-10"></div>
+        <div class="wide"><label for="index">Float index</label>
+          <select id="index">
+            <option value="OIS">CORRA OIS · compounded in arrears</option>
+            <option value="T3">Term CORRA 3M · dual curve</option>
+            <option value="T1">Term CORRA 1M · dual curve</option>
+          </select></div>
+        <div><label for="fixFreq">Fixed freq</label><select id="fixFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option><option value="1">Monthly</option><option value="0">At maturity</option></select></div>
+        <div><label for="fltFreq">Float freq</label><select id="fltFreq"><option value="12">Annual</option><option value="6" selected>Semi-annual</option><option value="3">Quarterly</option><option value="1">Monthly</option><option value="0">At maturity</option></select></div>
+        <div><label for="dc">Day count</label><select id="dc"><option value="A365F">ACT/365F</option><option value="A360">ACT/360</option></select></div>
+        <div><label for="spotLag">Spot lag (BD)</label><input id="spotLag" inputmode="numeric" value="0"></div>
+        <div><label for="payLag">Pay lag (BD)</label><input id="payLag" inputmode="numeric" value="1"></div>
+        <div class="wide termOnly hide"><label for="termFix">Known Term CORRA fixings % (seasoned only)</label><input id="termFix" placeholder="2.61, 2.64"></div>
+      </div>
+      <p class="note hide" id="convNote"></p>
+      <div class="buttons">
+        <button class="btn green" id="bRun">Calculate</button>
+        <button class="btn" id="bClear">Clear</button>
+        <button class="btn" id="bSample">Example</button>
+        <button class="btn" id="bXlsx">Export to Excel</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Valuation <small id="sumTag"></small><span class="sp"></span><button class="btn sm" data-copy="summary">Copy</button></h2>
+    <div class="body">
+      <div class="msgs" id="msgs"><div class="msg warn">Enter quotes and trade, then Calculate.</div></div>
+      <div class="kv" id="kv"></div>
+
+      <h3 class="sub">Cash flows</h3>
+      <div class="tblbar"><button class="btn sm" data-copy="cf">Copy</button><button class="btn sm" data-csv="cf">CSV</button></div>
+      <div class="scroll"><table id="t_cf"></table></div>
+
+      <h3 class="sub">Curve</h3>
+      <div class="tblbar"><button class="btn sm" data-copy="curves">Copy</button><button class="btn sm" data-csv="curves">CSV</button></div>
+      <div class="scroll" style="margin-bottom:10px"><table id="t_curves"></table></div>
+      <canvas class="ch" id="chCurve"></canvas>
+      <div class="legend" id="lgCurve"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Risk</h2>
+    <div class="body">
+      <h3 class="sub">Bucketed DV01 · +1bp per quote</h3>
+      <div class="tblbar"><button class="btn sm" data-copy="buckets">Copy</button><button class="btn sm" data-csv="buckets">CSV</button></div>
+      <div class="scroll" style="margin-bottom:10px"><table id="t_buckets"></table></div>
+      <canvas class="ch" id="chBucket" style="height:160px"></canvas>
+      <div class="legend"><span><i style="background:var(--blue)"></i>OIS</span><span><i style="background:var(--acc)"></i>Term CORRA</span></div>
+
+      <h3 class="sub">Scenario builder</h3>
+      <div class="form">
+        <div><label for="sPar">Parallel bp</label><input id="sPar" inputmode="decimal" placeholder="0"></div>
+        <div><label for="sSlope">2s10s Δ bp</label><input id="sSlope" inputmode="decimal" placeholder="0"></div>
+        <div><label for="sCurv">5Y belly bp</label><input id="sCurv" inputmode="decimal" placeholder="0"></div>
+        <div class="projOnly hide"><label for="sBasis">Term–OIS basis bp</label><input id="sBasis" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <div class="presets">
+        <button class="btn sm" data-p="100,0,0">+100</button>
+        <button class="btn sm" data-p="-100,0,0">−100</button>
+        <button class="btn sm" data-p="12.5,25,0">Bear steep</button>
+        <button class="btn sm" data-p="-12.5,-25,0">Bull flat</button>
+        <button class="btn sm" data-p="12.5,-25,0">Bear flat</button>
+        <button class="btn sm" data-p="-12.5,25,0">Bull steep</button>
+        <button class="btn sm" data-p="0,0,10">Fly +10</button>
+        <button class="btn sm" data-p="0,0,0">Reset</button>
+      </div>
+      <div class="buttons"><button class="btn" id="bApplyScen">Apply to curve</button></div>
+
+      <h3 class="sub">Scenario P&amp;L</h3>
+      <div class="tblbar"><button class="btn sm" data-copy="scen">Copy</button><button class="btn sm" data-csv="scen">CSV</button></div>
+      <div class="scroll"><table id="t_scen"></table></div>
+    </div>
+  </section>
+
+
+  <footer>Data: Bank of Canada</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const BP=1e-4;
+
+/* ================= DATES & CALENDAR ================= */
+const D={
+  ymd2n:(y,m,d)=>Math.round(Date.UTC(y,m-1,d)/864e5),
+  ymd:n=>{const d=new Date(n*864e5);return [d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate()]},
+  dow:n=>new Date(n*864e5).getUTCDay(),
+  iso:n=>new Date(n*864e5).toISOString().slice(0,10),
+  parse:s=>{const m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s).trim());return m?D.ymd2n(+m[1],+m[2],+m[3]):null},
+  addMonths:(n,k)=>{const [y,m,d]=D.ymd(n);const t=y*12+(m-1)+k;const Y=Math.floor(t/12),M=t-Y*12+1;
+    const last=new Date(Date.UTC(Y,M,0)).getUTCDate();return D.ymd2n(Y,M,Math.min(d,last))},
+  fmt:n=>new Date(n*864e5).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}),
+  today:()=>{const t=new Date();return D.ymd2n(t.getFullYear(),t.getMonth()+1,t.getDate())}
+};
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+  h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+  mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return D.ymd2n(y,mo,da)}
+function nthMon(y,m,n){let d=D.ymd2n(y,m,1);while(D.dow(d)!==1)d++;return d+7*(n-1)}
+const Cal={cache:{},
+  hol(y){if(this.cache[y])return this.cache[y];const H=new Set();
+    const obs=d=>{while(D.dow(d)===0||D.dow(d)===6||H.has(d))d++;H.add(d)};
+    obs(D.ymd2n(y,1,1));
+    if(y>=2008)H.add(nthMon(y,2,3));            // Family Day
+    H.add(easter(y)-2);                          // Good Friday
+    let v=D.ymd2n(y,5,24);while(D.dow(v)!==1)v--;H.add(v); // Victoria Day
+    obs(D.ymd2n(y,7,1));                         // Canada Day
+    H.add(nthMon(y,8,1));                        // Civic Holiday
+    H.add(nthMon(y,9,1));                        // Labour Day
+    H.add(nthMon(y,10,2));                       // Thanksgiving
+    obs(D.ymd2n(y,11,11));                       // Remembrance Day
+    obs(D.ymd2n(y,12,25));obs(D.ymd2n(y,12,26)); // Christmas, Boxing Day
+    return this.cache[y]=H},
+  isBD(n){const w=D.dow(n);if(w===0||w===6)return false;return !this.hol(D.ymd(n)[0]).has(n)},
+  fwd(n){while(!this.isBD(n))n++;return n},
+  back(n){while(!this.isBD(n))n--;return n},
+  mf(n){const f=this.fwd(n);return D.ymd(f)[1]===D.ymd(n)[1]?f:this.back(n)},
+  addBD(n,k){if(k<=0)return this.fwd(n);let d=n;while(k>0){d++;if(this.isBD(d))k--}return d}
+};
+function parseTenor(s){const m=/^\s*(\d+)\s*([DWMY])\s*$/i.exec(s||'');if(!m)return null;const n=+m[1],u=m[2].toUpperCase();
+  return {n,u,label:n+u,years:u==='Y'?n:u==='M'?n/12:u==='W'?n*7/365:n/365}}
+function addTenor(d,t){return t.u==='D'?d+t.n:t.u==='W'?d+7*t.n:D.addMonths(d,t.u==='Y'?12*t.n:t.n)}
+const yf=(s,e,dc)=>(e-s)/(dc==='A360'?360:365);
+
+function schedule(eff,matU,fm,payLag,dc){
+  const mat=Cal.mf(matU);const rolls=[];
+  if(fm>0){for(let k=1;k<2000;k++){const r=D.addMonths(matU,-k*fm);if(r<=eff+7)break;rolls.unshift(r)}}
+  const b=[eff,...rolls.map(r=>Cal.mf(r)),mat];const out=[];
+  for(let i=0;i<b.length-1;i++){if(b[i+1]<=b[i])continue;out.push({s:b[i],e:b[i+1],pay:Cal.addBD(b[i+1],payLag),tau:yf(b[i],b[i+1],dc)})}
+  return out;
+}
+
+/* ================= CURVES ================= */
+function Curve(t0){this.t0=t0;this.T=[0];this.L=[0]}
+Curve.prototype.ln=function(t){const T=this.T,L=this.L,n=T.length;if(t<=0||n<2)return 0;
+  let i=1;while(i<n-1&&T[i]<t)i++;return L[i-1]+(L[i]-L[i-1])*(t-T[i-1])/(T[i]-T[i-1])};
+Curve.prototype.df=function(d){return Math.exp(this.ln((d-this.t0)/365))};
+
+function bootstrap(t0,quotes,conv,disc,tag){
+  const c=new Curve(t0);const eff=Cal.addBD(t0,conv.spot);
+  const inst=quotes.map(q=>{const per=schedule(eff,addTenor(eff,q.ten),conv.fm,conv.pay,'A365F');
+    const L_=per[per.length-1];return {ten:q.ten,rate:q.rate,eff,mat:L_.e,pil:Math.max(L_.e,L_.pay),per}}).sort((a,b)=>a.pil-b.pil);
+  for(let i=1;i<inst.length;i++)if(inst[i].pil===inst[i-1].pil)throw new Error(tag+' curve: '+inst[i-1].ten.label+' and '+inst[i].ten.label+' mature on the same date.');
+  for(const ins of inst){
+    const t=(ins.pil-t0)/365;c.T.push(t);c.L.push(-ins.rate*t);const k=c.L.length-1;const Dc=disc||c;
+    const f=x=>{c.L[k]=x;let fl=0,fx=0;for(const p of ins.per){const dp=Dc.df(p.pay);fl+=(c.df(p.s)/c.df(p.e)-1)*dp;fx+=p.tau*dp}return fl-ins.rate*fx};
+    let x0=-ins.rate*t,x1=x0-1e-4,f0=f(x0),f1=f(x1);
+    for(let it=0;it<80&&Math.abs(f1)>1e-15;it++){if(f1===f0)break;const x2=x1-f1*(x1-x0)/(f1-f0);x0=x1;f0=f1;x1=x2;f1=f(x1)}
+    if(!(Math.abs(f1)<1e-12))throw new Error(tag+' curve failed to converge at '+ins.ten.label+'. Check the quotes.');
+    c.L[k]=x1;ins.t=(ins.mat-t0)/365;ins.df=c.df(ins.mat);ins.zero=-Math.log(ins.df)/ins.t;
+    ins.fwd=-(c.L[k]-c.L[k-1])/(c.T[k]-c.T[k-1]);
+  }
+  c.inst=inst;return c;
+}
+
+/* ================= FIXINGS (Bank of Canada) ================= */
+const VALET='https://www.bankofcanada.ca/valet/observations/';
+const fixMap=new Map();let fixFrom=null,lastLive=null;
+async function ensureFixings(from,to){
+  if(fixFrom!==null&&fixFrom<=from&&fixMap.size&&Math.max(...fixMap.keys())>=to-7)return;
+  const r=await fetch(VALET+'AVG.INTWO/json?start_date='+D.iso(from-10)+'&end_date='+D.iso(to),{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();
+  for(const o of j.observations||[]){const v=o['AVG.INTWO']&&parseFloat(o['AVG.INTWO'].v);if(isFinite(v))fixMap.set(D.parse(o.d),v/100)}
+  fixFrom=fixFrom===null?from:Math.min(fixFrom,from);
+}
+function fixingOn(d){if(fixMap.has(d))return {r:fixMap.get(d),est:false};
+  for(let k=1;k<=10;k++)if(fixMap.has(d-k))return {r:fixMap.get(d-k),est:true};
+  if(lastLive)return {r:lastLive,est:true};throw new Error('No CORRA fixing available for '+D.fmt(d)+'.')}
+function realizedOIS(s,cut,flags){let R=1,d=s;while(d<cut){const nx=Cal.addBD(d,1);const n=Math.min(nx,cut)-d;const f=fixingOn(d);if(f.est)flags.est++;R*=1+f.r*n/365;d=nx}return R}
+
+/* ================= PRICER ================= */
+function priceTrade(tr,cv){
+  const Dc=cv.disc,P=cv.proj||cv.disc,t0=tr.t0;const flags={est:0};
+  const fixP=schedule(tr.eff,tr.matU,tr.fixFm,tr.payLag,tr.dc),fltP=schedule(tr.eff,tr.matU,tr.fltFm,tr.payLag,tr.dc);
+  let pvFix=0,pvFlt=0,ann=0,accFix=0,accFlt=0;const rows=[];
+  for(const p of fixP){if(p.pay<=t0)continue;const cf=tr.N*tr.K*p.tau,df=Dc.df(p.pay);pvFix+=cf*df;ann+=p.tau*df;
+    if(p.s<t0&&t0<p.e)accFix=tr.N*tr.K*yf(p.s,t0,tr.dc);
+    rows.push({leg:'Fixed',p,rate:tr.K,cf,df,pv:cf*df,st:'Fixed'})}
+  let termIdx=0;
+  for(const p of fltP){if(p.pay<=t0)continue;let g,st;
+    if(p.s>=t0){g=P.df(p.s)/P.df(p.e);st='Projected'}
+    else{const cut=Math.min(t0,p.e);
+      if(tr.index==='OIS'){const R=realizedOIS(p.s,cut,flags);g=R*(p.e>t0?1/P.df(p.e):1);if(p.e>t0)accFlt=tr.N*(R-1)}
+      else{const m=tr.index==='T3'?3:1;let a=p.s,R=1,acc=1;
+        while(a<p.e&&a<t0){const b=Math.min(Cal.mf(D.addMonths(a,m)),p.e);const f=tr.termFix[termIdx++];
+          if(f==null)throw new Error('Seasoned Term CORRA trade: enter the known fixing for the sub-period starting '+D.fmt(a)+' (Fixings % field).');
+          R*=1+f*yf(a,b,tr.dc);acc*=b<=t0?1+f*yf(a,b,tr.dc):1+f*yf(a,t0,tr.dc);a=b}
+        g=R*(a<p.e?P.df(a)/P.df(p.e):1);if(p.e>t0)accFlt=tr.N*(acc-1)}
+      st=p.e>t0?'Partial':'Realised'}
+    const cf=tr.N*(g-1),df=Dc.df(p.pay);pvFlt+=cf*df;rows.push({leg:'Float',p,rate:(g-1)/p.tau,cf,df,pv:cf*df,st})}
+  const dir=tr.dir,pv=dir*(pvFlt-pvFix),acc=dir*(accFlt-accFix);
+  return {pv,clean:pv-acc,acc,accFix,accFlt,pvFix,pvFlt,ann,pv01:tr.N*ann*BP,be:ann>0?pvFlt/(tr.N*ann):NaN,rows,flags,
+    lastPay:Math.max(...rows.map(r=>r.p.pay))};
+}
+function buildCurves(st,oisQ,projQ){
+  const disc=bootstrap(st.t0,oisQ,st.cOis,null,'OIS');
+  const proj=st.tr.index==='OIS'?null:bootstrap(st.t0,projQ,st.cT,disc,'Term CORRA');
+  return {disc,proj};
+}
+const shiftQ=(q,f)=>q.map((x,i)=>({ten:x.ten,rate:x.rate+f(x,i)*BP}));
+function reval(st,fo,fp){const cv=buildCurves(st,shiftQ(st.oisQ,fo),st.projQ?shiftQ(st.projQ,fp||fo):null);return priceTrade(st.tr,cv).pv}
+
+/* ================= SCENARIOS ================= */
+const wSlope=t=>t<=2?-.5:t>=10?.5:-.5+(t-2)/8;
+const cBelly=t=>t<=2||t>=10?0:t<=5?(t-2)/3:(10-t)/5;
+const shape=(par,sl,cu)=>t=>par+sl*wSlope(t)+cu*cBelly(t);
+const MATRIX=[['Parallel −100',-100,0,0],['Parallel −50',-50,0,0],['Parallel −25',-25,0,0],['Parallel −10',-10,0,0],
+  ['Parallel +10',10,0,0],['Parallel +25',25,0,0],['Parallel +50',50,0,0],['Parallel +100',100,0,0],
+  ['Bear steepener (2Y 0 / 10Y +25)',12.5,25,0],['Bull flattener (2Y 0 / 10Y −25)',-12.5,-25,0],
+  ['Bear flattener (2Y +25 / 10Y 0)',12.5,-25,0],['Bull steepener (2Y −25 / 10Y 0)',-12.5,25,0],
+  ['Butterfly (5Y +10)',0,0,10],['Butterfly (5Y −10)',0,0,-10]];
+
+/* ================= FORMAT / CELLS ================= */
+const fm=(v,dp)=>isFinite(v)?(Math.abs(v)<.5*Math.pow(10,-dp)?0:v).toLocaleString('en-US',{minimumFractionDigits:dp,maximumFractionDigits:dp}):'—';
+const sf=v=>isFinite(v)?(Math.abs(v)<5e-5?0:v).toPrecision(4):'—';
+const sgn=v=>v>=.005?'pos':v<=-.005?'neg':'';
+const C={
+  s:(v,cls)=>({v,t:v,c:'l s '+(cls||'')}),
+  m:(v,cls)=>({v:Math.round(v*100)/100,t:fm(v,2),c:cls===undefined?sgn(v):cls}),
+  n:(v,dp)=>({v:+v.toFixed(dp),t:fm(v,dp),c:''}),
+  p:(v,dp)=>({v:+(v*100).toFixed(dp),t:fm(v*100,dp),c:''}),
+  d:n=>({v:D.iso(n),date:n,t:D.fmt(n),c:'l'}),
+  pc:v=>({v:+(v*100).toPrecision(10),t:sf(v*100),c:''})
+};
+const TABLES={};
+function renderTable(id,title,heads,rows,foot){
+  TABLES[id]={title,heads,rows:foot?rows.concat([foot]):rows};
+  const h='<thead><tr>'+heads.map((x,i)=>'<th class="'+(rows[0]&&rows[0][i]&&rows[0][i].c.includes('l')?'l':'')+'">'+x+'</th>').join('')+'</tr></thead>';
+  const r=cs=>'<tr>'+cs.map(c=>'<td class="'+c.c+'">'+c.t+'</td>').join('')+'</tr>';
+  $('t_'+id).innerHTML=h+'<tbody>'+rows.map(r).join('')+'</tbody>'+(foot?'<tfoot>'+r(foot)+'</tfoot>':'');
+}
+function tableAOA(id){const T=TABLES[id];if(!T)return null;return [T.heads.map(h=>h.replace(/<[^>]+>/g,'').replace(/&amp;/g,'&'))].concat(T.rows.map(r=>r.map(c=>c.v)))}
+const toTSV=a=>a.map(r=>r.map(v=>v==null?'':String(v)).join('\t')).join('\r\n');
+const toCSV=a=>a.map(r=>r.map(v=>{v=v==null?'':String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(',')).join('\r\n');
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+async function copyText(t,btn){try{await navigator.clipboard.writeText(t)}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
+  if(btn){const o=btn.textContent;btn.textContent='Copied';setTimeout(()=>btn.textContent=o,900)}}
+
+/* ================= INPUT GRID ================= */
+const DEF_TENORS=['1M','3M','6M','9M','1Y','18M','2Y','3Y','4Y','5Y','7Y','10Y','15Y','20Y','30Y'];
+const tbody=document.querySelector('#quoteGrid tbody');
+const isProj=()=>$('index').value!=='OIS';
+function addRow(ten){const i=tbody.rows.length+1;const tr=document.createElement('tr');
+  tr.innerHTML='<td class="l idx">'+i+'</td><td class="l"><input class="ten" value="'+(ten||'')+'" aria-label="Tenor"></td>'+
+  '<td><input class="qO" inputmode="decimal" aria-label="OIS par rate"></td><td class="projCol'+(isProj()?'':' hide')+'"><input class="qT" inputmode="decimal" aria-label="Term CORRA par rate"></td>'+
+  '<td><input class="qS" inputmode="decimal" aria-label="Scenario shift bp"></td>';tbody.appendChild(tr)}
+DEF_TENORS.forEach(t=>addRow(t));
+$('bAddRow').onclick=()=>addRow('');
+$('bDelRow').onclick=()=>{if(tbody.rows.length>1)tbody.deleteRow(-1)};
+function gridRows(){return [...tbody.rows].map(r=>({r,ten:r.querySelector('.ten'),o:r.querySelector('.qO'),t:r.querySelector('.qT'),s:r.querySelector('.qS')}))}
+
+tbody.addEventListener('paste',e=>{
+  const tgt=e.target;if(!(tgt instanceof HTMLInputElement))return;
+  const txt=(e.clipboardData||window.clipboardData).getData('text');if(!/[\t\n]/.test(txt.trim()))return;
+  e.preventDefault();
+  const lines=txt.replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='').map(l=>l.split('\t').map(x=>x.trim()));
+  const rows=gridRows();let start=rows.findIndex(x=>x.r.contains(tgt));
+  const cls=['ten','qO','qT','qS'];let col=cls.findIndex(c=>tgt.classList.contains(c));
+  if(parseTenor(lines[0][0])&&lines[0].length>1)col=0;
+  const nums=lines.flatMap(l=>l.slice(col===0?1:0)).map(v=>parseFloat(v.replace(/[%,]/g,''))).filter(isFinite);
+  const dec=nums.length&&!/%/.test(txt)&&nums.every(v=>Math.abs(v)<0.2)&&col!==3;
+  while(tbody.rows.length<start+lines.length)addRow('');
+  const R=gridRows();
+  lines.forEach((l,k)=>{l.forEach((v,j)=>{const c=col+j;if(c>3)return;const inp=R[start+k][['ten','o','t','s'][c]];
+    if(c===0)inp.value=v;else{let x=parseFloat(v.replace(/[%,]/g,''));inp.value=isFinite(x)?(dec&&c<3?+(x*100).toFixed(6):x):''}})});
+  if(dec)note('Decimals converted to %.','warn',true);
+  markEdited();
+});
+
+/* ================= STATE / UI ================= */
+function setConvDefaults(){const p=isProj();
+  $('spotLag').value=p?2:0;$('payLag').value=p?0:1;$('fixFreq').value='6';$('fltFreq').value='6';$('dc').value='A365F';
+  document.querySelectorAll('.projCol').forEach(e=>e.classList.toggle('hide',!p));
+  document.querySelectorAll('.termOnly,.projOnly').forEach(e=>e.classList.toggle('hide',!p));
+  $('convNote').textContent=p?'CARR terms: T+2 · semi-annual · ACT/365F · no pay lag · OIS discounting.'
+    :'T+0 · semi-annual · ACT/365F · 1 BD pay lag.';
+}
+$('index').addEventListener('change',setConvDefaults);setConvDefaults();
+$('valDate').value=D.iso(D.today());
+
+const msgBox=$('msgs');
+function clearMsgs(){msgBox.innerHTML=''}
+function note(t,kind,keep){if(!keep)clearMsgs();const d=document.createElement('div');d.className='msg '+(kind||'');d.textContent=t;msgBox.appendChild(d)}
+const num=s=>{s=String(s==null?'':s).replace(/[,\s$%_]/g,'');if(s==='')return null;const v=Number(s);return isFinite(v)?v:NaN};
+
+let sample=false;
+function markEdited(){if(sample){sample=false;$('sampleBadge').classList.add('hide')}}
+document.querySelectorAll('#quoteGrid').forEach(g=>g.addEventListener('input',markEdited));
+
+function readState(){
+  document.querySelectorAll('input.err').forEach(e=>e.classList.remove('err'));
+  const errs=[];const bad=(id,m)=>{if(id)(typeof id==='string'?$(id):id).classList.add('err');errs.push(m)};
+  const t0=D.parse($('valDate').value);if(t0==null)bad('valDate','valuation date');
+  const N=num($('notional').value);if(!(N>0))bad('notional','notional');
+  const Kp=num($('fixed').value);if(Kp==null||isNaN(Kp))bad('fixed','fixed rate');
+  const index=$('index').value;const proj=index!=='OIS';
+  const spot=parseInt($('spotLag').value,10),payLag=parseInt($('payLag').value,10);
+  if(!(spot>=0))bad('spotLag','spot lag');if(!(payLag>=0))bad('payLag','payment lag');
+  const oisQ=[],projQ=[];const shifts=[];
+  for(const g of gridRows()){const ten=parseTenor(g.ten.value);const o=num(g.o.value),t=proj?num(g.t.value):null,s=num(g.s.value);
+    if(g.ten.value.trim()===''&&o==null&&t==null)continue;
+    if(!ten){if(o!=null||t!=null)bad(g.ten,'tenor "'+g.ten.value+'" (use 1M, 18M, 5Y…)');continue}
+    if(o!=null){if(isNaN(o))bad(g.o,ten.label+' OIS quote');else oisQ.push({ten,rate:o/100,sh:isNaN(s)||s==null?0:s})}
+    if(proj&&t!=null){if(isNaN(t))bad(g.t,ten.label+' Term quote');else projQ.push({ten,rate:t/100,sh:isNaN(s)||s==null?0:s})}
+    if(s!=null&&isNaN(s))bad(g.s,ten.label+' scenario shift');
+  }
+  if(!oisQ.length)errs.push('at least one OIS par quote');
+  if(proj&&!projQ.length)errs.push('at least one Term CORRA par quote (Float = Term CORRA uses a separate projection curve)');
+  const cOis={spot:parseInt($('cOisSpot').value,10)||0,pay:parseInt($('cOisPay').value,10)||0,fm:+$('cOisFreq').value};
+  const cT={spot:parseInt($('cTSpot').value,10)||0,pay:parseInt($('cTPay').value,10)||0,fm:+$('cTFreq').value};
+  let eff=null,matU=null;
+  if(t0!=null){
+    const e=$('effDate').value?D.parse($('effDate').value):null;eff=e!=null?Cal.mf(e):Cal.addBD(t0,isNaN(spot)?0:spot);
+    const mv=$('mat').value.trim();const ten=parseTenor(mv);const md=D.parse(mv);
+    if(ten)matU=addTenor(eff,ten);else if(md!=null)matU=md;else bad('mat','maturity (tenor like 5Y, or a date YYYY-MM-DD)');
+    if(matU!=null&&Cal.mf(matU)<=eff)bad('mat','maturity after the effective date');
+  }
+  const termFix=$('termFix').value.split(/[,;\s]+/).map(num).filter(v=>v!=null&&isFinite(v)).map(v=>v/100);
+  if(errs.length)throw new Error('Please enter a valid '+errs.join(', ')+'.');
+  const tr={t0,eff,matU,N,K:Kp/100,dir:+$('dir').value,index,fixFm:+$('fixFreq').value,fltFm:+$('fltFreq').value,payLag,dc:$('dc').value,termFix};
+  return {t0,tr,oisQ,projQ:proj?projQ:null,cOis,cT,basis:num($('sBasis').value)||0};
+}
+
+/* ================= RUN ================= */
+let LAST=null;
+async function run(){
+  let st;try{st=readState()}catch(e){note(e.message);return}
+  const warns=[];
+  try{
+    if(st.tr.eff<st.t0&&st.tr.index==='OIS'){
+      try{await ensureFixings(st.tr.eff,st.t0)}catch(e){warns.push('Could not load CORRA fixings from the Bank of Canada ('+e.message+'); realised periods use the latest known fixing.')}
+    }
+    const cv=buildCurves(st,st.oisQ,st.projQ);
+    const base=priceTrade(st.tr,cv);
+    if(!base.rows.length)throw new Error('All cash flows are paid on or before the valuation date.');
+    const up=reval(st,()=>1),dn=reval(st,()=>-1);
+    const dv01=up-base.pv,gamma=up+dn-2*base.pv;
+    // buckets
+    const buckets=[];
+    st.oisQ.forEach((q,i)=>buckets.push({curve:'OIS',q,dv:reval(st,(x,j)=>j===i?1:0,()=>0)-base.pv}));
+    if(st.projQ)st.projQ.forEach((q,i)=>buckets.push({curve:'Term',q,dv:reval(st,()=>0,(x,j)=>j===i?1:0)-base.pv}));
+    if(st.projQ){/* OIS bumps already move the projection curve through the dual bootstrap */}
+    // scenarios
+    const scen=MATRIX.map(([name,p,s,c])=>{const f=shape(p,s,c);const pv=reval(st,x=>f(x.ten.years));return {name,pv,pnl:pv-base.pv}});
+    const hasCustom=st.oisQ.some(q=>q.sh)||(st.projQ&&(st.projQ.some(q=>q.sh)||st.basis));
+    let custom=null,cvS=null;
+    if(hasCustom){const fo=x=>x.sh,fp=x=>x.sh+st.basis;
+      cvS=buildCurves(st,shiftQ(st.oisQ,fo),st.projQ?shiftQ(st.projQ,fp):null);const pv=priceTrade(st.tr,cvS).pv;
+      custom={name:'Custom (grid Scen Δ'+(st.basis?' + basis '+st.basis+'bp':'')+')',pv,pnl:pv-base.pv}}
+    const lastPillar=Math.max(...cv.disc.inst.map(x=>x.mat),...(cv.proj?cv.proj.inst.map(x=>x.mat):[]));
+    if(base.lastPay>lastPillar)warns.push('Cash flows past last pillar ('+D.fmt(lastPillar)+'): flat extrapolation.');
+    if(base.flags.est)warns.push(base.flags.est+' unpublished fixing day(s) used the latest fixing.');
+    if(sample)warns.push('Sample quotes, not market data.');
+    LAST={st,cv,base,dv01,gamma,buckets,scen,custom,cvS};
+    render();
+    clearMsgs();
+    if(warns.length)warns.forEach(w=>note(w,'warn',true));else note('Priced '+new Date().toLocaleTimeString(),'ok',true);
+  }catch(e){note(e.message);console.error(e)}
+}
+
+/* ================= RENDER ================= */
+function render(){
+  const {st,cv,base,dv01,gamma,buckets,scen,custom}=LAST;const tr=st.tr;
+  const side=tr.dir>0?'Pay fixed':'Receive fixed';
+  $('sumTag').textContent=side+' · '+({OIS:'CORRA OIS',T3:'Term CORRA 3M',T1:'Term CORRA 1M'})[tr.index]+(st.projQ?' · dual curve':' · single curve');
+  const fixP=schedule(tr.eff,tr.matU,tr.fixFm,tr.payLag,tr.dc);const mat=fixP[fixP.length-1].e;
+  const kv=[
+    ['PV (dirty)',fm(base.pv,2),sgn(base.pv),1],['Clean PV',fm(base.clean,2),sgn(base.clean),1],
+    ['DV01 (+1bp par)',fm(dv01,2),sgn(dv01),1],['PV01 (fixed leg)',fm(base.pv01,2),'',0],
+    ['Gamma (1bp)',fm(gamma,2),sgn(gamma),0],['Accrued (net)',fm(base.acc,2),sgn(base.acc),0],
+    ['PV fixed leg',fm(base.pvFix,2),'',0],['PV float leg',fm(base.pvFlt,2),'',0],
+    ['Fixed rate',sf(tr.K*100)+'%','',0],['Breakeven rate',sf(base.be*100)+'%','acc',0],
+    ['Notional',fm(tr.N,0),'',0],['Valuation',D.fmt(st.t0),'',0],['Effective',D.fmt(tr.eff),'',0],['Maturity',D.fmt(mat),'',0]
+  ];
+  if(custom)kv.splice(4,0,['Custom scen. P&L',fm(custom.pnl,2),sgn(custom.pnl),1]);
+  $('kv').innerHTML=kv.map(([k,v,c,h])=>'<div class="'+(h?'hl':'')+'"><b>'+k+'</b><span class="'+c+'">'+v+'</span></div>').join('');
+  TABLES.summary={title:'Summary',heads:['Metric','Value'],rows:[
+    ['Side',side],['Float index',tr.index],['Valuation date',D.iso(st.t0)],['Effective date',D.iso(tr.eff)],['Maturity date',D.iso(mat)],
+    ['Notional',tr.N],['Fixed rate (%)',tr.K*100],['PV dirty',r2(base.pv)],['PV clean',r2(base.clean)],['Accrued net',r2(base.acc)],
+    ['PV fixed leg',r2(base.pvFix)],['PV float leg',r2(base.pvFlt)],['Breakeven rate (%)',+(base.be*100).toFixed(6)],
+    ['DV01 (+1bp parallel par)',r2(dv01)],['PV01 fixed leg',r2(base.pv01)],['Gamma (1bp)',r2(gamma)]]
+    .concat(custom?[['Custom scenario P&L',r2(custom.pnl)]]:[]).map(r=>r.map(v=>({v})))};
+
+  // buckets
+  const tot=buckets.reduce((a,b)=>a+b.dv,0);
+  renderTable('buckets','Bucketed DV01',['Curve','Tenor','Pillar date','Quote %','DV01','% of total'],
+    buckets.map(b=>[C.s(b.curve),C.s(b.q.ten.label),C.d(curveInst(b).mat),C.pc(b.q.rate),C.m(b.dv),C.n(tot?100*b.dv/tot:0,1)]),
+    [C.s('Σ buckets'),C.s(''),C.s(''),C.s('par Δ '+fm(dv01,2),'mut'),C.m(tot),C.n(100,1)]);
+  drawBuckets(buckets);
+
+  // scenarios
+  const srows=scen.concat(custom?[custom]:[]);
+  renderTable('scen','Scenario P&L',['Scenario','Scenario PV','P&L','P&L / |DV01|'],
+    srows.map(s=>[C.s(s.name),C.m(s.pv,''),C.m(s.pnl),C.n(dv01?s.pnl/Math.abs(dv01):0,1)]));
+  drawCurves();
+
+  // cash flows
+  const rows=base.rows.slice().sort((a,b)=>a.p.pay-b.p.pay||a.leg.localeCompare(b.leg));
+  let sF=0,sL=0;
+  renderTable('cf','Cash flows',['Leg','Accrual start','Accrual end','Pay date','Days','τ','Rate %','Status','Cash flow','DF (pay)','PV (your side)'],
+    rows.map(r=>{const sgnLeg=(r.leg==='Fixed'?-1:1)*tr.dir;const pv=sgnLeg*r.pv;if(r.leg==='Fixed')sF+=pv;else sL+=pv;
+      return [C.s(r.leg,r.leg==='Fixed'?'acc':''),C.d(r.p.s),C.d(r.p.e),C.d(r.p.pay),C.n(r.p.e-r.p.s,0),C.n(r.p.tau,6),C.pc(r.rate),C.s(r.st,'mut'),C.m(sgnLeg*r.cf),C.n(r.df,8),C.m(pv)]}),
+    [C.s('Total'),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.s(''),C.m(sF+sL)]);
+
+  // curves
+  const crow=(name,ins)=>[C.s(name),C.s(ins.ten.label),C.d(ins.mat),C.n(ins.t,6),C.pc(ins.rate),C.n(ins.df,10),C.pc(ins.zero),C.pc(ins.fwd)];
+  renderTable('curves','Curves',['Curve','Tenor','Maturity','t (yrs)','Par %','Discount factor','Zero % (cc)','Fwd % (seg)'],
+    cv.disc.inst.map(i=>crow('CORRA OIS',i)).concat(cv.proj?cv.proj.inst.map(i=>crow('Term CORRA',i)):[]));
+}
+const r2=v=>Math.round(v*100)/100;
+function curveInst(b){const c=b.curve==='OIS'?LAST.cv.disc:LAST.cv.proj;return c.inst.find(x=>x.ten===b.q.ten)||{mat:0}}
+
+/* ================= CHARTS ================= */
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function prep(cv){const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);x.font='10px '+css('--mono');return {x,w,h}}
+function drawBuckets(b){
+  const {x,w,h}=prep($('chBucket'));if(!b.length)return;
+  const L=56,R=6,T=6,B=16,pw=w-L-R,ph=h-T-B;const mx=Math.max(1e-9,...b.map(v=>Math.abs(v.dv)));
+  const y0=T+ph/2,sc=ph/2/mx,bw=pw/b.length;
+  x.strokeStyle=css('--line2');x.beginPath();x.moveTo(L,y0);x.lineTo(L+pw,y0);x.stroke();
+  x.fillStyle=css('--muted');x.textAlign='right';x.fillText(fm(mx,0),L-4,T+8);x.fillText(fm(-mx,0),L-4,T+ph);x.fillText('0',L-4,y0+3);
+  b.forEach((v,i)=>{x.fillStyle=v.curve==='OIS'?css('--blue'):css('--acc');const bh=v.dv*sc;
+    x.fillRect(L+i*bw+bw*.15,bh>0?y0-bh:y0,bw*.7,Math.max(1,Math.abs(bh)));
+    if(bw>18){x.fillStyle=css('--muted');x.textAlign='center';x.fillText(v.q.ten.label,L+i*bw+bw/2,h-4)}});
+}
+function drawCurves(){
+  const {x,w,h}=prep($('chCurve'));const {cv,cvS,st}=LAST;
+  const end=Math.max(...cv.disc.inst.map(i=>i.mat),st.tr.matU);const t0=st.t0;const step=Math.max(7,Math.round((end-t0)/120));
+  const series=[];const zero=c=>d=>-Math.log(c.df(d))/((d-t0)/365);const fwd3=c=>d=>(c.df(d)/c.df(d+91)-1)*365/91;
+  series.push({n:'OIS zero',f:zero(cv.disc),c:css('--blue'),w:2});
+  series.push({n:'OIS 3M fwd',f:fwd3(cv.disc),c:css('--blue'),w:1,dash:[3,3]});
+  if(cv.proj)series.push({n:'Term zero',f:zero(cv.proj),c:css('--pos'),w:1.5});
+  if(cvS)series.push({n:'Scenario OIS zero',f:zero(cvS.disc),c:css('--acc'),w:1.5});
+  const pts=[];for(let d=t0+step;d<=end;d+=step)pts.push(d);
+  const ys=series.map(s=>pts.map(s.f));const all=ys.flat().filter(isFinite);
+  let lo=Math.min(...all),hi=Math.max(...all);const pad=Math.max(.0005,(hi-lo)*.08);lo-=pad;hi+=pad;
+  const L=44,R=6,T=6,B=16,pw=w-L-R,ph=h-T-B;const X=d=>L+pw*(d-t0)/(end-t0),Y=v=>T+ph*(1-(v-lo)/(hi-lo));
+  x.strokeStyle=css('--line');x.fillStyle=css('--muted');x.textAlign='right';
+  for(let k=0;k<=3;k++){const v=lo+(hi-lo)*k/3;x.beginPath();x.moveTo(L,Y(v));x.lineTo(L+pw,Y(v));x.stroke();x.fillText((v*100).toFixed(2)+'%',L-4,Y(v)+3)}
+  x.textAlign='center';for(let yr=1;yr<=60;yr++){const d=D.addMonths(t0,12*yr);if(d>end)break;if((end-t0)/365>12&&yr%5)continue;if(X(d)>w-14)continue;x.fillText(yr+'Y',X(d),h-4)}
+  series.forEach((s,i)=>{x.strokeStyle=s.c;x.lineWidth=s.w;x.setLineDash(s.dash||[]);x.beginPath();ys[i].forEach((v,j)=>j?x.lineTo(X(pts[j]),Y(v)):x.moveTo(X(pts[j]),Y(v)));x.stroke()});
+  x.setLineDash([]);
+  $('lgCurve').innerHTML=series.map(s=>'<span><i style="background:'+s.c+(s.dash?';opacity:.6':'')+'"></i>'+s.n+'</span>').join('');
+}
+
+/* ================= LIVE DATA ================= */
+let hist=[];
+async function loadLive(){
+  
+  try{const r=await fetch(VALET+'AVG.INTWO,V39079/json?recent=60',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);
+    const j=await r.json();const obs=(j.observations||[]).slice().sort((a,b)=>a.d<b.d?-1:1);
+    hist=obs.map(o=>({d:o.d,c:o['AVG.INTWO']&&parseFloat(o['AVG.INTWO'].v),p:o.V39079&&parseFloat(o.V39079.v)}));
+    for(const o of hist)if(isFinite(o.c))fixMap.set(D.parse(o.d),o.c/100);
+    const lc=[...hist].reverse().find(o=>isFinite(o.c)),lp=[...hist].reverse().find(o=>isFinite(o.p));
+    if(!lc)throw new Error('no data');lastLive=lc.c/100;
+    $('tkCorra').textContent=lc.c.toFixed(2)+'%';$('tkCorraD').textContent=D.fmt(D.parse(lc.d));
+    $('tkPol').textContent=lp?lp.p.toFixed(2)+'%':'—';
+    $('liveSt').textContent='';drawSpark();
+  }catch(e){$('tkCorraD').textContent='—';$('liveSt').textContent='Feed unavailable ('+e.message+')';}
+}
+function drawSpark(){const {x,w,h}=prep($('spark'));const v=hist.filter(o=>isFinite(o.c));if(v.length<2)return;
+  const all=v.flatMap(o=>[o.c,o.p]).filter(isFinite);let lo=Math.min(...all)-.03,hi=Math.max(...all)+.03;
+  const X=i=>1+i*(w-2)/(v.length-1),Y=y=>2+(h-4)*(1-(y-lo)/(hi-lo));
+  x.strokeStyle=css('--dim');x.setLineDash([2,2]);x.beginPath();v.forEach((o,i)=>i?x.lineTo(X(i),Y(o.p)):x.moveTo(X(i),Y(o.p)));x.stroke();x.setLineDash([]);
+  x.strokeStyle=css('--acc');x.lineWidth=1.4;x.beginPath();v.forEach((o,i)=>i?x.lineTo(X(i),Y(o.c)):x.moveTo(X(i),Y(o.c)));x.stroke()}
+
+/* ================= EXPORT ================= */
+function loadSheetJS(){return new Promise((res,rej)=>{if(window.XLSX)return res(window.XLSX);const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>res(window.XLSX);s.onerror=()=>rej(new Error('SheetJS failed to load'));document.head.appendChild(s)})}
+function inputsAOA(){const st=LAST.st,tr=st.tr;const a=[['Field','Value'],['Valuation date',D.iso(st.t0)],['Side',tr.dir>0?'Pay fixed':'Receive fixed'],['Notional',tr.N],['Fixed rate (%)',tr.K*100],
+  ['Effective',D.iso(tr.eff)],['Maturity (unadj.)',D.iso(tr.matU)],['Float index',tr.index],['Fixed freq (months, 0=1T)',tr.fixFm],['Float freq (months)',tr.fltFm],['Day count',tr.dc],['Pay lag BD',tr.payLag],
+  ['Calendar','Toronto, Modified Following'],[],['Tenor','OIS par (%)','Term par (%)','Scen shift (bp)']];
+  for(const g of gridRows())if(g.ten.value||g.o.value||(g.t&&g.t.value))a.push([g.ten.value,num(g.o.value),num(g.t.value),num(g.s.value)]);return a}
+async function exportXlsx(){
+  if(!LAST){note('Calculate first, then export.');return}
+  const sheets=[['Summary',TABLES.summary&&[TABLES.summary.heads].concat(TABLES.summary.rows.map(r=>r.map(c=>c.v)))],['Inputs',inputsAOA()],
+    ['Curves',tableAOA('curves')],['Cashflows',tableAOA('cf')],['Bucketed_DV01',tableAOA('buckets')],['Scenarios',tableAOA('scen')]];
+  const stamp=D.iso(LAST.st.t0);
+  try{const X=await loadSheetJS();const wb=X.utils.book_new();
+    for(const [n,a] of sheets){if(!a)continue;const ws=X.utils.aoa_to_sheet(a.map(r=>r.map(v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)?new Date(+v.slice(0,4),+v.slice(5,7)-1,+v.slice(8,10)):v)),{cellDates:true,dateNF:'yyyy-mm-dd'});
+      ws['!cols']=a[0].map((_,i)=>({wch:Math.min(34,Math.max(10,...a.map(r=>String(r[i]==null?'':r[i]).length+2)))}));X.utils.book_append_sheet(wb,ws,n)}
+    X.writeFile(wb,'CORRA_swap_risk_'+stamp+'.xlsx');
+  }catch(e){const csv=sheets.filter(s=>s[1]).map(([n,a])=>'# '+n+'\r\n'+toCSV(a)).join('\r\n\r\n');
+    download('CORRA_swap_risk_'+stamp+'.csv',new Blob([csv],{type:'text/csv'}));note('Excel library unavailable; downloaded CSV instead.','warn')}
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-copy],[data-csv]');if(!b)return;
+  const id=b.dataset.copy||b.dataset.csv;let a;
+  if(id==='quotes'){a=[['Tenor','OIS par %','Term par %','Scen bp']].concat(gridRows().filter(g=>g.ten.value||g.o.value).map(g=>[g.ten.value,g.o.value,g.t.value,g.s.value]))}
+  else if(id==='summary'){a=TABLES.summary?[TABLES.summary.heads].concat(TABLES.summary.rows.map(r=>r.map(c=>c.v))):null}
+  else a=tableAOA(id);
+  if(!a){note('Calculate first.');return}
+  if(b.dataset.copy)copyText(toTSV(a),b);else download(id+'_'+(LAST?D.iso(LAST.st.t0):'')+'.csv',new Blob([toCSV(a)],{type:'text/csv'}))});
+
+/* ================= BUTTONS ================= */
+$('bRun').onclick=run;
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('input'))run()});
+$('bXlsx').onclick=exportXlsx;
+$('bApplyScen').onclick=()=>{const f=shape(num($('sPar').value)||0,num($('sSlope').value)||0,num($('sCurv').value)||0);
+  gridRows().forEach(g=>{const t=parseTenor(g.ten.value);g.s.value=t?+f(t.years).toFixed(2)||'':''});if(LAST)run()};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const [p,s,c]=b.dataset.p.split(',');
+  $('sPar').value=+p||'';$('sSlope').value=+s||'';$('sCurv').value=+c||'';$('bApplyScen').click()});
+$('bClear').onclick=()=>{document.querySelectorAll('#quoteGrid input:not(.ten),#notional,#fixed,#effDate,#mat,#termFix,#sPar,#sSlope,#sCurv,#sBasis').forEach(i=>i.value='');
+  markEdited();LAST=null;['buckets','scen','cf','curves'].forEach(id=>$('t_'+id).innerHTML='');$('kv').innerHTML='';$('sumTag').textContent='';
+  prep($('chBucket'));prep($('chCurve'));$('lgCurve').innerHTML='';note('Cleared.','warn')};
+const SAMPLE_OIS=[2.505,2.512,2.530,2.560,2.600,2.680,2.760,2.880,2.980,3.060,3.190,3.340,3.500,3.560,3.520];
+const SAMPLE_T=[2.585,2.600,2.625,2.660,2.705,2.790,2.870,2.990,3.090,3.170,3.300,3.450,3.610,3.670,3.630];
+$('bSample').onclick=()=>{
+  while(tbody.rows.length<DEF_TENORS.length)addRow('');
+  gridRows().forEach((g,i)=>{g.ten.value=DEF_TENORS[i]||'';g.o.value=SAMPLE_OIS[i]??'';g.t.value=SAMPLE_T[i]??'';});
+  $('notional').value='100,000,000';$('fixed').value='3.05';$('mat').value='5Y';
+  sample=true;$('sampleBadge').classList.remove('hide');run()};
+
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{drawSpark();if(LAST){drawBuckets(LAST.buckets);drawCurves()}},120)});
+
+loadLive();
+window.__engine={D,Cal,schedule,bootstrap,priceTrade,parseTenor,addTenor};
+})();
+</script>
+</body>
+</html>
